@@ -121,6 +121,13 @@ COPY init_scripts/config.sh \
      init_scripts/entrypoint.sh \
      /usr/local/bin/
 
+# Convert CRLF to LF for all copied shell scripts
+RUN sed -i 's/\r$//' /usr/local/bin/config.sh && \
+    sed -i 's/\r$//' /usr/local/bin/init_models.sh && \
+    sed -i 's/\r$//' /usr/local/bin/init_extensions.sh && \
+    sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
+
+    
 # Make scripts executable
 RUN chmod +x /usr/local/bin/config.sh \
     /usr/local/bin/init_models.sh \
