@@ -79,7 +79,9 @@ WORKDIR ${COMFYUI_DIR}
 
 # Checkout to last known stable tag
 RUN git fetch --tags && \
-    git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+
+RUN /venv/bin/python3 -m pip install --no-cache-dir -r ${COMFYUI_DIR}/requirements.txt
 
 # Create required directories and __init__.py file
 RUN mkdir -p ${COMFYUI_DIR}/models \
