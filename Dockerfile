@@ -151,4 +151,4 @@ EXPOSE 8188
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-CMD ["python3", "main.py", "--listen", "--port", "8188", "--enable-cors-header", "*"]
+CMD ["python3", "main.py", "--listen", "--port", "8188", "--enable-cors-header", "*", "--lowvram", "--async-offload", "--multi-user"]
