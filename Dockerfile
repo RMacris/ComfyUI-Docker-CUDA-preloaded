@@ -1,5 +1,5 @@
 # ComfyUI Docker with CUDA support - Optimized for faster builds
-FROM nvidia/cuda:12.8.1-devel-ubuntu24.04 AS base
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS base
 
 LABEL maintainer="ComfyUI Docker Maintainer"
 LABEL version="1.0"
@@ -13,6 +13,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH" \
     HF_HUB_ENABLE_HF_TRANSFER=1
 
+# Fix NVIDIA repository GPG keys and update sources
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    gnupg \
+    wget \
+    && wget -qO - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub | apt-key add - \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install system dependencies - grouped by category and alphabetized
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Build tools and version control
@@ -20,10 +29,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git-lfs \
     ninja-build \
     cmake \
-    # Python
-    python3.12 \
-    python3.12-dev \
-    python3.12-venv \
+    # Python 3.11 (available in Ubuntu 22.04 repos)
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3.11-distutils \
     # Libraries for GUI and media
     ffmpeg \
     libgl1 \
@@ -49,17 +59,20 @@ RUN mkdir -p /app /venv && \
 # Switch to ubuntu user for Python package installation
 USER 1000
 
-# Setup virtual environment
-RUN python3.12 -m venv /venv
+# Setup virtual environment with Python 3.11
+RUN python3.11 -m venv /venv
 
-# Install PyTorch and dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-    torch==2.6.0 \
-    torchvision \
-    torchaudio \
-    --index-url https://download.pytorch.org/whl/cu124 && \
-    pip install --no-cache-dir -U xformers --index-url https://download.pytorch.org/whl/cu124
+# Install PyTorch and dependencies (split into smaller steps to reduce peak disk usage)
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install PyTorch first
+RUN pip install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+
+# Install torchvision and torchaudio
+RUN pip install --no-cache-dir torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Install xformers
+RUN pip install --no-cache-dir -U xformers --index-url https://download.pytorch.org/whl/cu124
 
 RUN git clone https://github.com/TimDettmers/bitsandbytes.git /tmp/bitsandbytes && \
     cd /tmp/bitsandbytes && \
@@ -109,6 +122,8 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     streamdiffusion \
     git+https://github.com/rodjjo/filterpy.git
 
+# Note: SageAttention will be installed at runtime when GPUs are available
+
 # This is a separate stage for the init scripts
 # Changes to these scripts won't invalidate the previous cache
 FROM base
@@ -151,4 +166,4 @@ EXPOSE 8188
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-CMD ["python3", "main.py", "--listen", "--port", "8188", "--enable-cors-header", "*", "--lowvram", "--async-offload", "--multi-user"]
+CMD ["python3", "main.py", "--listen", "--port", "8188", "--enable-cors-header", "*", "--lowvram", "--multi-user"]
